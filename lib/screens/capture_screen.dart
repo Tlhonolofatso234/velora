@@ -15,8 +15,11 @@ class CaptureScreen extends ConsumerStatefulWidget {
 }
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
+  List<CameraDescription> _cameras = [];
   CameraController? _controller;
+  int _activeCameraIndex = 0;
   bool _taking = false;
+  bool _switching = false;
 
   @override
   void initState() {
@@ -27,10 +30,43 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   Future<void> _init() async {
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
-    final controller = CameraController(cameras.first, ResolutionPreset.high, enableAudio: false);
+
+    // Default to the back (environment-facing) camera explicitly —
+    // `cameras.first` is not guaranteed to be the back camera on every
+    // device/platform, which is what was showing the selfie camera.
+    final backIndex = cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
+    _cameras = cameras;
+    _activeCameraIndex = backIndex != -1 ? backIndex : 0;
+
+    await _openCamera(_activeCameraIndex);
+  }
+
+  Future<void> _openCamera(int index) async {
+    final previous = _controller;
+    final controller = CameraController(_cameras[index], ResolutionPreset.high, enableAudio: false);
     await controller.initialize();
-    if (!mounted) return;
-    setState(() => _controller = controller);
+    await previous?.dispose();
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+    setState(() {
+      _controller = controller;
+      _activeCameraIndex = index;
+    });
+  }
+
+  bool get _hasMultipleCameras => _cameras.length > 1;
+
+  Future<void> _switchCamera() async {
+    if (!_hasMultipleCameras || _switching) return;
+    setState(() => _switching = true);
+    final nextIndex = (_activeCameraIndex + 1) % _cameras.length;
+    try {
+      await _openCamera(nextIndex);
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
   }
 
   Future<void> _takePhoto() async {
@@ -86,27 +122,52 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
           Positioned(
             bottom: 36,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _takePhoto,
-                child: Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: VeloraColors.white, width: 3),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: VeloraColors.white),
+            left: 40,
+            right: 40,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SizedBox(width: 30), // keeps the shutter visually centred
+
+                GestureDetector(
+                  onTap: _takePhoto,
+                  child: Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: VeloraColors.white, width: 3),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: VeloraColors.white),
+                      ),
                     ),
                   ),
                 ),
-              ),
+
+                if (_hasMultipleCameras)
+                  GestureDetector(
+                    onTap: _switchCamera,
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: VeloraColors.white.withValues(), width: 1.5),
+                      ),
+                      child: _switching
+                          ? const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: VeloraColors.white),
+                            )
+                          : const Icon(Icons.cameraswitch_outlined, color: VeloraColors.white, size: 16),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 30),
+              ],
             ),
           ),
         ],
