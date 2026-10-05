@@ -38,6 +38,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     _cameras = cameras;
     _activeCameraIndex = backIndex != -1 ? backIndex : 0;
 
+    // Temporary — check your debug console. If this prints 1, the switch
+    // button is correctly hidden/disabled because there's genuinely only
+    // one camera available (common on emulators). Remove once confirmed.
+    debugPrint('Velora: found ${cameras.length} camera(s): '
+        '${cameras.map((c) => c.lensDirection).join(', ')}');
+
     await _openCamera(_activeCameraIndex);
   }
 
@@ -148,25 +154,33 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   ),
                 ),
 
-                if (_hasMultipleCameras)
-                  GestureDetector(
-                    onTap: _switchCamera,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: VeloraColors.white.withValues(), width: 1.5),
+                // Always rendered now (greyed out + disabled when only one
+                // camera exists) so a missing icon is never ambiguous —
+                // if you don't see ANY circle here, it's a layout/build
+                // issue, not a "no second camera" issue.
+                GestureDetector(
+                  onTap: _hasMultipleCameras ? _switchCamera : null,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: VeloraColors.white.withValues(),
+                        width: 1.5,
                       ),
-                      child: _switching
-                          ? const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: CircularProgressIndicator(strokeWidth: 2, color: VeloraColors.white),
-                            )
-                          : const Icon(Icons.cameraswitch_outlined, color: VeloraColors.white, size: 16),
                     ),
-                  )
-                else
-                  const SizedBox(width: 30),
+                    child: _switching
+                        ? const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: VeloraColors.white),
+                          )
+                        : Icon(
+                            Icons.cameraswitch_outlined,
+                            color: VeloraColors.white.withValues(),
+                            size: 16,
+                          ),
+                  ),
+                ),
               ],
             ),
           ),

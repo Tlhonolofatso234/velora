@@ -4,7 +4,7 @@ import '../theme/colors.dart';
 /// The one status every scan resolves to. Drives colour, icon and
 /// copy everywhere a diagnosis is shown — never branch UI on a raw
 /// string from the API, branch on this.
-enum Severity { healthy, caution, issue,  }
+enum Severity { healthy, caution, issue }
 
 extension SeverityX on Severity {
   String get label => switch (this) {

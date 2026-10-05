@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/env.dart';
 import '../models/diagnosis_result.dart';
 import '../services/crop_analysis_service.dart';
+import '../services/plantnet_crop_analysis_service.dart';
 
 /// Every screen in the scan flow renders exactly one of these states —
 /// never a loose combination of booleans/flags. Use an exhaustive
@@ -60,9 +63,19 @@ class ScanFlowNotifier extends StateNotifier<ScanFlowState> {
   void reset() => state = const ScanIdle();
 }
 
-/// Swap this single provider to go from the fake service to a real
-/// one later — nothing else in the app needs to change.
+/// Swaps between the real Pl@ntNet service and the fake one — nothing
+/// else in the app needs to change either way. Falls back to the fake
+/// service (with a console warning) if no API key was provided via
+/// --dart-define, so the app never silently fails to build/run.
 final cropAnalysisServiceProvider = Provider<CropAnalysisService>((ref) {
+  if (Env.hasPlantNetKey) {
+    return RemoteCropAnalysisService(apiKey: Env.plantNetApiKey);
+  }
+  debugPrint(
+    'Velora: no PLANTNET_API_KEY provided — falling back to '
+    'FakeCropAnalysisService. Run with --dart-define=PLANTNET_API_KEY=... '
+    'to use the real Pl@ntNet API.',
+  );
   return FakeCropAnalysisService();
 });
 
